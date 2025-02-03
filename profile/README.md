@@ -1,6 +1,6 @@
 # 📊 Organization Statistics
 | Metric              | Count |
 |---------------------|-------|
-| 📁 Total Repositories | Updating... |
-| 🔥 Total Commits | Updating... |
-| 👥 Total Members | Updating... |
+| 📁 Total Repositories | 2 |
+| 🔥 Total Commits | 61 |
+| 👥 Total Members | 2 |
