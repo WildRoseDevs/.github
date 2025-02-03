@@ -33,11 +33,12 @@ jobs:
                          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
           MEMBER_COUNT=$((MEMBER_COUNT - 1))
 
-          # Fetch Total Commits Using API First, Git as Fallback
+          # Initialize commit count
           COMMIT_COUNT=0
           mkdir -p temp_repos
           cd temp_repos || exit
 
+          # Loop through each repo
           for repo in $(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                              -H "Accept: application/vnd.github+json" \
                              "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
@@ -46,12 +47,12 @@ jobs:
               
               # Try GitHub API for commit count
               REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                            -H "Accept: application/vnd.github.cloak-preview" \
-                            "https://api.github.com/repos/$ORG_NAME/$repo/stats/participation" | jq '.all | add')
+                            -H "Accept: application/vnd.github+json" \
+                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=1" | jq length)
 
-              # If API fails or returns null, fallback to git
-              if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ]; then
-                  echo "API failed for $repo, cloning instead..."
+              # If API fails or returns 0, fallback to cloning
+              if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ] || [ "$REPO_COMMITS" -eq 0 ]; then
+                  echo "API failed or found no commits for $repo, cloning instead..."
                   if git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
                       cd "$repo.git" || continue
                       REPO_COMMITS=$(git rev-list --all --count || echo "0")
