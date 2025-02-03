@@ -50,12 +50,12 @@ jobs:
               # Try GitHub API for commit count
               API_RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                             -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=1")
+                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=100")
 
               echo "API Response for $repo:"
               echo "$API_RESPONSE"
 
-              REPO_COMMITS=$(echo "$API_RESPONSE" | jq length)
+              REPO_COMMITS=$(echo "$API_RESPONSE" | jq 'map(.sha) | length')
               
               # If API fails or returns 0, fallback to cloning
               if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ] || [ "$REPO_COMMITS" -eq 0 ]; then
@@ -63,6 +63,7 @@ jobs:
                   if git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
                       cd "$repo.git" || continue
                       REPO_COMMITS=$(git rev-list --all --count || echo "0")
+                      [ "$REPO_COMMITS" = "0" ] && REPO_COMMITS=$(git log --oneline | wc -l || echo "0")
                       cd ..
                   else
                       echo "Failed to clone $repo"
