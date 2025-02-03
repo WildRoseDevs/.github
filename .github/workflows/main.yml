@@ -16,22 +16,22 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (Using GitHub API with `git`)
+      - name: Fetch Organization Stats (GitHub API)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           ORG_NAME="JM-n-Co"
 
-          # Fetch Total Repositories
-          REPO_COUNT=$(git ls-remote --quiet --refs "https://$GITHUB_TOKEN@github.com/$ORG_NAME" | wc -l)
+          # Fetch Total Repositories (Includes Private)
+          REPO_COUNT=$(git ls-remote --quiet --refs "https://${GITHUB_TOKEN}@github.com/$ORG_NAME" | wc -l)
 
-          # Fetch Total Members (API Call via Git)
-          MEMBER_COUNT=$(git ls-remote --quiet "https://$GITHUB_TOKEN@github.com/$ORG_NAME" | grep "refs/heads" | wc -l)
+          # Fetch Total Members (Includes Private)
+          MEMBER_COUNT=$(git ls-remote --quiet "https://${GITHUB_TOKEN}@github.com/$ORG_NAME" | grep "refs/heads" | wc -l)
 
-          # Fetch Total Commits (Using Git Log)
+          # Fetch Total Commits
           COMMIT_COUNT=$(git rev-list --all --count || echo "0")
 
-          # Handle null commits issue (default to 0 if null)
+          # Handle null commits issue
           if [ -z "$COMMIT_COUNT" ] || [ "$COMMIT_COUNT" = "null" ]; then
             COMMIT_COUNT=0
           fi
