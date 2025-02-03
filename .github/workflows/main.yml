@@ -18,8 +18,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           ORG_NAME="JM-n-Co"
+
+          # Fetch Total Repositories
           REPO_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/orgs/$ORG_NAME/repos" | jq length)
+
+          # Fetch Total Members
           MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/orgs/$ORG_NAME/members" | jq length)
+
+          # Fetch Total Commits
           COMMIT_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/search/commits?q=org:$ORG_NAME" -H "Accept: application/vnd.github.cloak-preview" | jq .total_count)
 
           echo "ORG_REPOS=$REPO_COUNT" >> $GITHUB_ENV
@@ -29,7 +35,7 @@ jobs:
       - name: Update README.md
         run: |
           cat <<EOF > .github/profile/README.md
-          # 🏢 Organization Statistics
+          # 📊 Organization Statistics
 
           | Metric            | Count |
           |------------------|------|
