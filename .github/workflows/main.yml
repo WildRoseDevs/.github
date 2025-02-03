@@ -16,7 +16,7 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (Commit Fix)
+      - name: Fetch Organization Stats (Commit Debugging)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
@@ -26,12 +26,14 @@ jobs:
           REPO_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                        -H "Accept: application/vnd.github+json" \
                        "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq length)
+          echo "Total Repositories: $REPO_COUNT"
 
           # Fetch Total Members (Includes Private Members) and subtract 1
           MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                          -H "Accept: application/vnd.github+json" \
                          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
           MEMBER_COUNT=$((MEMBER_COUNT - 1))
+          echo "Total Members: $MEMBER_COUNT"
 
           # Initialize commit count
           COMMIT_COUNT=0
@@ -44,12 +46,17 @@ jobs:
                              "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
               
               echo "Processing repo: $repo"
-              
-              # Try GitHub API for commit count
-              REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                            -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=1" | jq length)
 
+              # Try GitHub API for commit count
+              API_RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                            -H "Accept: application/vnd.github+json" \
+                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=1")
+
+              echo "API Response for $repo:"
+              echo "$API_RESPONSE"
+
+              REPO_COMMITS=$(echo "$API_RESPONSE" | jq length)
+              
               # If API fails or returns 0, fallback to cloning
               if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ] || [ "$REPO_COMMITS" -eq 0 ]; then
                   echo "API failed or found no commits for $repo, cloning instead..."
@@ -58,6 +65,7 @@ jobs:
                       REPO_COMMITS=$(git rev-list --all --count || echo "0")
                       cd ..
                   else
+                      echo "Failed to clone $repo"
                       REPO_COMMITS=0
                   fi
               fi
@@ -74,7 +82,7 @@ jobs:
           # Debug Output
           echo "Repositories: $REPO_COUNT"
           echo "Members: $MEMBER_COUNT"
-          echo "Commits: $COMMIT_COUNT"
+          echo "Total Commits Counted: $COMMIT_COUNT"
 
           echo "ORG_REPOS=$REPO_COUNT" >> $GITHUB_ENV
           echo "ORG_MEMBERS=$MEMBER_COUNT" >> $GITHUB_ENV
