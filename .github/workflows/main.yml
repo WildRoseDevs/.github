@@ -16,20 +16,28 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats
+      - name: Authenticate GitHub CLI
+        run: echo ${{ secrets.GH_API_TOKEN }} | gh auth login --with-token
+
+      - name: Fetch Organization Stats (Using `gh`)
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_API_TOKEN }}
         run: |
           ORG_NAME="JM-n-Co"
 
           # Fetch Total Repositories
-          REPO_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/orgs/$ORG_NAME/repos" | jq length)
+          REPO_COUNT=$(gh repo list $ORG_NAME --limit 100 --json name --jq 'length')
 
           # Fetch Total Members
-          MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/orgs/$ORG_NAME/members" | jq length)
+          MEMBER_COUNT=$(gh api orgs/$ORG_NAME/members --jq 'length')
 
-          # Fetch Total Commits
-          COMMIT_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/search/commits?q=org:$ORG_NAME" -H "Accept: application/vnd.github.cloak-preview" | jq .total_count)
+          # Fetch Total Commits (Alternative approach using `gh`)
+          COMMIT_COUNT=$(gh search commits --owner $ORG_NAME --json totalCount --jq '.totalCount')
+
+          # Handle null commits issue (default to 0 if null)
+          if [ -z "$COMMIT_COUNT" ] || [ "$COMMIT_COUNT" = "null" ]; then
+            COMMIT_COUNT=0
+          fi
 
           echo "ORG_REPOS=$REPO_COUNT" >> $GITHUB_ENV
           echo "ORG_MEMBERS=$MEMBER_COUNT" >> $GITHUB_ENV
