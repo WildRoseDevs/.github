@@ -3,7 +3,7 @@ name: Update Org Stats
 on:
   schedule:
     - cron: '0 0 * * *'  # Runs daily at midnight UTC
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:
 
 jobs:
   update-org-stats:
@@ -16,61 +16,79 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (Cloning Fix)
+      - name: Fetch Organization Stats (Fixing API Issue)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           ORG_NAME="JM-n-Co"
 
-          # Fetch Total Repositories (Includes Private)
-          REPO_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                       -H "Accept: application/vnd.github+json" \
-                       "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq length)
+          echo "Fetching repositories..."
+          REPO_RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                                 -H "Accept: application/vnd.github+json" \
+                                 "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all")
 
-          # Fetch Total Members (Includes Private Members) and subtract 1
-          MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                         -H "Accept: application/vnd.github+json" \
-                         "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
+          # Debugging: Print the raw response
+          echo "Raw API Response for Repos:"
+          echo "$REPO_RESPONSE"
+
+          # Check if the API response is JSON
+          if echo "$REPO_RESPONSE" | jq empty 2>/dev/null; then
+              REPO_COUNT=$(echo "$REPO_RESPONSE" | jq length)
+          else
+              echo "❌ Error: API did not return valid JSON. Check token permissions."
+              exit 1
+          fi
+
+          echo "Total Repositories: $REPO_COUNT"
+
+          # Fetch Total Members
+          MEMBER_RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                                   -H "Accept: application/vnd.github+json" \
+                                   "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all")
+
+          echo "Raw API Response for Members:"
+          echo "$MEMBER_RESPONSE"
+
+          if echo "$MEMBER_RESPONSE" | jq empty 2>/dev/null; then
+              MEMBER_COUNT=$(echo "$MEMBER_RESPONSE" | jq length)
+          else
+              echo "❌ Error: API did not return valid JSON for members."
+              exit 1
+          fi
+
           MEMBER_COUNT=$((MEMBER_COUNT - 1))
+          echo "Total Members: $MEMBER_COUNT"
 
-          # Initialize commit count
+          # Get repositories from GitHub CLI instead of API
+          echo "Fetching repository list using gh CLI..."
+          REPO_LIST=$(gh repo list $ORG_NAME --json name --jq '.[].name')
+
+          if [ -z "$REPO_LIST" ]; then
+              echo "❌ Error: gh CLI could not retrieve repos. Check token permissions."
+              exit 1
+          fi
+
+          echo "Repositories Retrieved: $REPO_LIST"
+
+          # Clone each repo to count commits
           COMMIT_COUNT=0
           mkdir -p temp_repos
           cd temp_repos || exit
 
-          # Get all repositories
-          REPO_LIST=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                             -H "Accept: application/vnd.github+json" \
-                             "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name')
-
-          # Clone each repo and count commits
           for repo in $REPO_LIST; do
               echo "Processing repo: $repo"
 
-              # Clone full repository history
               if git clone --mirror "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
                   cd "$repo.git" || continue
-                  
-                  # Count commits across all branches
                   REPO_COMMITS=$(git rev-list --all --count || echo "0")
-                  
                   echo "Commits in $repo: $REPO_COMMITS"
                   COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
-                  
                   cd ..
               else
-                  echo "Failed to clone $repo"
+                  echo "❌ Failed to clone $repo"
               fi
           done
 
-          # Handle null commits issue (default to 0 if empty)
-          if [ -z "$COMMIT_COUNT" ] || [ "$COMMIT_COUNT" = "null" ]; then
-            COMMIT_COUNT=0
-          fi
-
-          # Debug Output
-          echo "Repositories: $REPO_COUNT"
-          echo "Members: $MEMBER_COUNT"
           echo "Total Commits Counted: $COMMIT_COUNT"
 
           echo "ORG_REPOS=$REPO_COUNT" >> $GITHUB_ENV
