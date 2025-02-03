@@ -4,5 +4,5 @@
 |------------------|------|
 | 📂 Total Repositories | 3 |
 | 🔥 Total Commits   | 0 |
-| 👥 Total Members   | 3 |
+| 👥 Total Members   | 2 |
 
