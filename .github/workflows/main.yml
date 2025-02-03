@@ -16,7 +16,7 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (Fix Member & Commit Count)
+      - name: Fetch Organization Stats (Fix Commit Count)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
@@ -32,23 +32,30 @@ jobs:
                          -H "Accept: application/vnd.github+json" \
                          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
 
-          # Fetch Total Commits (Across All Repositories)
+          # Fetch Total Commits Using `git` (Instead of API)
           COMMIT_COUNT=0
+          mkdir -p temp_repos
+          cd temp_repos
+
           for repo in $(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                              -H "Accept: application/vnd.github+json" \
                              "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
               
-              REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                                  -H "Accept: application/vnd.github+json" \
-                                  "https://api.github.com/repos/$ORG_NAME/$repo/stats/contributors" | jq '[.[].total] | add')
-
-              # If repo has no commit data, set it to 0
-              if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ]; then
-                REPO_COMMITS=0
-              fi
+              echo "Cloning repo: $repo"
+              git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"
+              cd $repo.git
               
+              REPO_COMMITS=$(git rev-list --all --count || echo "0")
+              cd ..
+              
+              echo "Commits in $repo: $REPO_COMMITS"
               COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
           done
+
+          # Handle null commits issue (default to 0 if empty)
+          if [ -z "$COMMIT_COUNT" ] || [ "$COMMIT_COUNT" = "null" ]; then
+            COMMIT_COUNT=0
+          fi
 
           # Debug Output
           echo "Repositories: $REPO_COUNT"
