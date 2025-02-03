@@ -27,12 +27,13 @@ jobs:
                        -H "Accept: application/vnd.github+json" \
                        "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq length)
 
-          # Fetch Total Members (Includes Private Members)
+          # Fetch Total Members (Includes Private Members) and subtract 1
           MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                          -H "Accept: application/vnd.github+json" \
                          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
+          MEMBER_COUNT=$((MEMBER_COUNT - 1))
 
-          # Fetch Total Commits Using `git` (Instead of API)
+          # Fetch Total Commits Using `git`
           COMMIT_COUNT=0
           mkdir -p temp_repos
           cd temp_repos
@@ -42,7 +43,7 @@ jobs:
                              "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
               
               echo "Cloning repo: $repo"
-              git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"
+              git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git" || continue
               cd $repo.git
               
               REPO_COMMITS=$(git rev-list --all --count || echo "0")
