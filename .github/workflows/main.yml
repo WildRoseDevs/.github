@@ -56,7 +56,7 @@ jobs:
               exit 1
           fi
 
-          MEMBER_COUNT=$((MEMBER_COUNT - 1))
+          MEMBER_COUNT=$((MEMBER_COUNT))
           echo "Total Members: $MEMBER_COUNT"
 
           # Get repositories from GitHub CLI instead of API
