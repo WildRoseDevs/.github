@@ -1,3 +1,4 @@
+# Force GitHub to detect workflow
 name: Update Organization Stats
 
 on:
