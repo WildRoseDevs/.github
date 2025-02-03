@@ -45,18 +45,17 @@ jobs:
               
               echo "Processing repo: $repo"
 
-              # Try GitHub API for commit count (ensuring it uses the default branch)
+              # Try GitHub API for commit count (all branches)
               REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                             -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?sha=main&per_page=100" | jq 'map(.sha) | length')
+                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=100" | jq 'map(.sha) | length')
 
               # If API fails or returns 0, fallback to cloning
               if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ] || [ "$REPO_COMMITS" -eq 0 ]; then
                   echo "API failed or found no commits for $repo, cloning instead..."
-                  if git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
+                  if git clone --mirror "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
                       cd "$repo.git" || continue
                       REPO_COMMITS=$(git rev-list --all --count || echo "0")
-                      [ "$REPO_COMMITS" = "0" ] && REPO_COMMITS=$(git log --oneline | wc -l || echo "0")
                       cd ..
                   else
                       echo "Failed to clone $repo"
