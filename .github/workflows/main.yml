@@ -38,7 +38,7 @@ jobs:
       - name: Update Organization README.md
         run: |
           cat <<EOF > profile/README.md
-          # 📊 Organization Statistics
+          # 📊 Dev. Jack Statistics
 
           | Metric            | Count |
           |------------------|------|
