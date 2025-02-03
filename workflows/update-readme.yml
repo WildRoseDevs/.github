@@ -1,4 +1,4 @@
-# Force GitHub to detect workflow
+# Testing workflow detection
 name: Update Organization Stats
 
 on:
