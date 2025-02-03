@@ -1,0 +1,48 @@
+name: Update Organization Stats
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs every day at midnight UTC
+  workflow_dispatch:  # Allows manual execution
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Fetch Organization Data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ORG_TOKEN }}
+          ORG_NAME: "JM-n-Co"
+        run: |
+          # Get total repositories (public + private)
+          TOTAL_REPOS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/orgs/$ORG_NAME" | jq '.public_repos + .total_private_repos')
+
+          # Get total commits across all repos
+          TOTAL_COMMITS=0
+          for repo in $(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/orgs/$ORG_NAME/repos" | jq -r '.[].name'); do
+            COMMITS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$ORG_NAME/$repo/stats/contributors" | jq '[.[].total] | add')
+            TOTAL_COMMITS=$((TOTAL_COMMITS + COMMITS))
+          done
+
+          # Get total members (public + private)
+          TOTAL_MEMBERS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100" | jq 'length')
+
+          # Update README.md inside `.github/profile/`
+          sed -i "s/📁 Total Repositories | .*/📁 Total Repositories | $TOTAL_REPOS |/g" .github/profile/README.md
+          sed -i "s/🔥 Total Commits | .*/🔥 Total Commits | $TOTAL_COMMITS |/g" .github/profile/README.md
+          sed -i "s/👥 Total Members | .*/👥 Total Members | $TOTAL_MEMBERS |/g" .github/profile/README.md
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git add .github/profile/README.md
+          git commit -m "Updated Organization Stats" || exit 0
+          git push
