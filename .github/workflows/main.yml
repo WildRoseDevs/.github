@@ -33,24 +33,34 @@ jobs:
                          "https://api.github.com/orgs/$ORG_NAME/members?per_page=100&filter=all" | jq length)
           MEMBER_COUNT=$((MEMBER_COUNT - 1))
 
-          # Fetch Total Commits Using `git`
+          # Fetch Total Commits Using `git` (Fixing Clone Issues)
           COMMIT_COUNT=0
           mkdir -p temp_repos
-          cd temp_repos
+          cd temp_repos || exit
 
           for repo in $(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                              -H "Accept: application/vnd.github+json" \
                              "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
               
-              echo "Cloning repo: $repo"
-              git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git" || continue
-              cd $repo.git
+              echo "Processing repo: $repo"
               
-              REPO_COMMITS=$(git rev-list --all --count || echo "0")
-              cd ..
-              
-              echo "Commits in $repo: $REPO_COMMITS"
-              COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
+              # Ensure we clone successfully
+              if git clone --bare "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
+                  cd "$repo.git" || continue
+
+                  # Check if the repo has any commits before counting
+                  if git rev-parse --is-inside-git-dir > /dev/null 2>&1; then
+                      REPO_COMMITS=$(git rev-list --all --count || echo "0")
+                  else
+                      REPO_COMMITS=0
+                  fi
+
+                  echo "Commits in $repo: $REPO_COMMITS"
+                  COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
+                  cd ..
+              else
+                  echo "Skipping $repo (Clone failed)"
+              fi
           done
 
           # Handle null commits issue (default to 0 if empty)
