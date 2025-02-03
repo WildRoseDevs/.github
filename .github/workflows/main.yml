@@ -7,7 +7,7 @@ on:
 
 jobs:
   update-org-stats:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use Linux to make `curl` work properly
 
     steps:
       - name: Checkout repository
@@ -16,25 +16,42 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (GitHub API)
+      - name: Fetch Organization Stats (Using `curl`)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           ORG_NAME="JM-n-Co"
 
           # Fetch Total Repositories (Includes Private)
-          REPO_COUNT=$(git ls-remote --quiet --refs "https://${GITHUB_TOKEN}@github.com/$ORG_NAME" | wc -l)
+          REPO_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                       -H "Accept: application/vnd.github+json" \
+                       "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq length)
 
           # Fetch Total Members (Includes Private)
-          MEMBER_COUNT=$(git ls-remote --quiet "https://${GITHUB_TOKEN}@github.com/$ORG_NAME" | grep "refs/heads" | wc -l)
+          MEMBER_COUNT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                         -H "Accept: application/vnd.github+json" \
+                         "https://api.github.com/orgs/$ORG_NAME/members?per_page=100" | jq length)
 
-          # Fetch Total Commits
-          COMMIT_COUNT=$(git rev-list --all --count || echo "0")
+          # Fetch Total Commits Across All Repositories
+          COMMIT_COUNT=0
+          for repo in $(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github+json" \
+                             "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
+              REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                                  -H "Accept: application/vnd.github.cloak-preview" \
+                                  "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=1" | jq length)
+              COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
+          done
 
-          # Handle null commits issue
+          # Handle null commits issue (default to 0 if empty)
           if [ -z "$COMMIT_COUNT" ] || [ "$COMMIT_COUNT" = "null" ]; then
             COMMIT_COUNT=0
           fi
+
+          # Debugging output
+          echo "Repositories: $REPO_COUNT"
+          echo "Members: $MEMBER_COUNT"
+          echo "Commits: $COMMIT_COUNT"
 
           echo "ORG_REPOS=$REPO_COUNT" >> $GITHUB_ENV
           echo "ORG_MEMBERS=$MEMBER_COUNT" >> $GITHUB_ENV
