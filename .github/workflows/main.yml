@@ -16,7 +16,7 @@ jobs:
       - name: Ensure profile directory exists
         run: mkdir -p profile
 
-      - name: Fetch Organization Stats (Final Fix)
+      - name: Fetch Organization Stats (Cloning Fix)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
@@ -38,33 +38,29 @@ jobs:
           mkdir -p temp_repos
           cd temp_repos || exit
 
-          # Loop through each repo
-          for repo in $(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+          # Get all repositories
+          REPO_LIST=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                              -H "Accept: application/vnd.github+json" \
-                             "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name'); do
-              
+                             "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100&type=all" | jq -r '.[].name')
+
+          # Clone each repo and count commits
+          for repo in $REPO_LIST; do
               echo "Processing repo: $repo"
 
-              # Try GitHub API for commit count (all branches)
-              REPO_COMMITS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                            -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/repos/$ORG_NAME/$repo/commits?per_page=100" | jq 'map(.sha) | length')
-
-              # If API fails or returns 0, fallback to cloning
-              if [ "$REPO_COMMITS" = "null" ] || [ -z "$REPO_COMMITS" ] || [ "$REPO_COMMITS" -eq 0 ]; then
-                  echo "API failed or found no commits for $repo, cloning instead..."
-                  if git clone --mirror "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
-                      cd "$repo.git" || continue
-                      REPO_COMMITS=$(git rev-list --all --count || echo "0")
-                      cd ..
-                  else
-                      echo "Failed to clone $repo"
-                      REPO_COMMITS=0
-                  fi
+              # Clone full repository history
+              if git clone --mirror "https://$GITHUB_TOKEN@github.com/$ORG_NAME/$repo.git"; then
+                  cd "$repo.git" || continue
+                  
+                  # Count commits across all branches
+                  REPO_COMMITS=$(git rev-list --all --count || echo "0")
+                  
+                  echo "Commits in $repo: $REPO_COMMITS"
+                  COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
+                  
+                  cd ..
+              else
+                  echo "Failed to clone $repo"
               fi
-
-              echo "Commits in $repo: $REPO_COMMITS"
-              COMMIT_COUNT=$((COMMIT_COUNT + REPO_COMMITS))
           done
 
           # Handle null commits issue (default to 0 if empty)
