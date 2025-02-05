@@ -2,7 +2,7 @@
 
 | Metric            | Count |
 |------------------|------|
-| 📂 Total Repositories | 3 |
-| 🔥 Total Commits   | 105 |
+| 📂 Total Repositories | 4 |
+| 🔥 Total Commits   | 110 |
 | 👥 Total Members   | 2 |
 
