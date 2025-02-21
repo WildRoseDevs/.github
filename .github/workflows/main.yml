@@ -98,7 +98,7 @@ jobs:
       - name: Update Organization README.md
         run: |
           cat <<EOF > profile/README.md
-          # 📊 Dev. Jack Statistics
+          # 📊 Wild Rose Developers' Statistics
 
           | Metric            | Count |
           |------------------|------|
